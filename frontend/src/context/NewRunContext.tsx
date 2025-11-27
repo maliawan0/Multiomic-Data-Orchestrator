@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import { ValidationIssue, runValidation as performValidation } from '@/lib/validation';
+import logEvent from '@/lib/logger';
 
 export interface Mapping {
   [canonicalField: string]: string; // maps canonical field to csv column
@@ -40,10 +41,12 @@ export const NewRunProvider = ({ children }: { children: ReactNode }) => {
     setFileMappings(prev => [...prev, ...newFileMappings]);
     setRunStatus('idle');
     setValidationIssues([]);
+    logEvent('FILES_UPLOADED', { count: newFiles.length, names: newFiles.map(f => f.name) });
   };
 
   const removeFile = (fileName: string) => {
     setFileMappings(prev => prev.filter(fm => fm.file.name !== fileName));
+    logEvent('FILE_REMOVED', { fileName });
   };
 
   const updateFileMapping = (fileName:string, update: Partial<Omit<FileMapping, 'file'>>) => {
@@ -60,11 +63,16 @@ export const NewRunProvider = ({ children }: { children: ReactNode }) => {
 
   const runValidation = () => {
     setRunStatus('pending');
+    logEvent('VALIDATION_RUN_STARTED', { fileCount: fileMappings.length });
     // Simulate async process
     setTimeout(() => {
       const issues = performValidation(fileMappings);
       setValidationIssues(issues);
       setRunStatus('complete');
+      logEvent('VALIDATION_RUN_COMPLETED', { 
+        blockers: issues.filter(i => i.severity === 'Blocker').length,
+        warnings: issues.filter(i => i.severity === 'Warning').length,
+      });
     }, 500);
   };
 
@@ -72,6 +80,7 @@ export const NewRunProvider = ({ children }: { children: ReactNode }) => {
     setFileMappings([]);
     setValidationIssues([]);
     setRunStatus('idle');
+    logEvent('NEW_RUN_RESET');
   };
 
   const files = fileMappings.map(fm => fm.file);

@@ -4,14 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Download, ShieldAlert, Info } from "lucide-react";
-import { useMemo } from "react";
+import { AlertCircle, CheckCircle, Download, ShieldAlert, Info, Loader2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+import logEvent from "@/lib/logger";
 
 const ValidationPage = () => {
-  const { validationIssues, resetRun } = useNewRun();
+  const { validationIssues, resetRun, fileMappings } = useNewRun();
   const navigate = useNavigate();
+  const [isExporting, setIsExporting] = useState(false);
 
   const { blockers, warnings, infos } = useMemo(() => {
     const blockers = validationIssues.filter(i => i.severity === 'Blocker');
@@ -23,14 +27,51 @@ const ValidationPage = () => {
   const handleDownloadReport = () => {
     const csv = Papa.unparse(validationIssues);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'validation_report.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    saveAs(blob, 'validation_report.csv');
+    logEvent('VALIDATION_REPORT_DOWNLOADED');
+  };
+
+  const handleExportBundle = async () => {
+    setIsExporting(true);
+    logEvent('EXPORT_BUNDLE_STARTED');
+    const zip = new JSZip();
+
+    // 1. Final Validation Report
+    const validationReportCsv = Papa.unparse(validationIssues);
+    zip.file("validation_report.csv", validationReportCsv);
+
+    // 2. Mapping File
+    const mappingConfig = fileMappings.map(fm => ({
+      fileName: fm.file.name,
+      templateId: fm.templateId,
+      mapping: fm.mapping,
+    }));
+    zip.file("mapping.json", JSON.stringify(mappingConfig, null, 2));
+
+    // 3. Mock Canonical Tables & Join Index
+    zip.file("canonical_libraries.csv", "Library_ID,Sample_ID,Run_ID\nLIB-001,SAMPLE-A,RUN-X\nLIB-002,SAMPLE-B,RUN-X");
+    zip.file("canonical_runs.csv", "Run_ID,Instrument,Date\nRUN-X,Illumina-1,2024-01-01");
+    zip.file("join_index.csv", "Canonical_ID,Library_ID,Slide_ID\nID-1,LIB-001,SLIDE-123");
+
+    // 4. JSON Manifest
+    const manifest = {
+      runId: `run-${new Date().getTime()}`,
+      exportedAt: new Date().toISOString(),
+      schemaTemplates: [...new Set(fileMappings.map(fm => fm.templateId))],
+      files: fileMappings.map(fm => fm.file.name),
+    };
+    zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+
+    try {
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, `MDO_Export_Bundle_${manifest.runId}.zip`);
+      logEvent('EXPORT_BUNDLE_SUCCESS', { runId: manifest.runId });
+    } catch (error) {
+      console.error("Failed to generate zip file", error);
+      logEvent('EXPORT_BUNDLE_FAILURE', { error });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleNewRun = () => {
@@ -92,8 +133,8 @@ const ValidationPage = () => {
                             <Download className="mr-2 h-4 w-4" />
                             Download Report
                         </Button>
-                        <Button disabled={!isReadyForExport}>
-                            <CheckCircle className="mr-2 h-4 w-4" />
+                        <Button onClick={handleExportBundle} disabled={!isReadyForExport || isExporting}>
+                            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                             Export Bundle
                         </Button>
                     </div>
