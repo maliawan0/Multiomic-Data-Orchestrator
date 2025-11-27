@@ -13,6 +13,7 @@ import LoginPage from "./pages/Login";
 import { AuthProvider } from "./context/AuthContext";
 import { NewRunProvider } from "./context/NewRunContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { MappingProvider } from "./context/MappingContext";
 
 const queryClient = new QueryClient();
 
@@ -23,19 +24,21 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <NewRunProvider>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/" element={<ProtectedRoute />}>
-                <Route index element={<Index />} />
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="upload" element={<UploadPage />} />
-                <Route path="mapping" element={<MappingPage />} />
-                <Route path="validation" element={<ValidationPage />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </NewRunProvider>
+          <MappingProvider>
+            <NewRunProvider>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/" element={<ProtectedRoute />}>
+                  <Route index element={<Index />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="upload" element={<UploadPage />} />
+                  <Route path="mapping" element={<MappingPage />} />
+                  <Route path="validation" element={<ValidationPage />} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </NewRunProvider>
+          </MappingProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

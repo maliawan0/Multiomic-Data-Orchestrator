@@ -9,12 +9,21 @@ import { Badge } from "@/components/ui/badge";
 import { useEffect, useState, useMemo } from "react";
 import Papa from "papaparse";
 import { useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
+import { useMappings } from "@/context/MappingContext";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
 
 const MappingPage = () => {
   const { fileMappings, updateFileMapping, setFileColumns, runValidation, runStatus } = useNewRun();
+  const { saveMapping } = useMappings();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [isParsing, setIsParsing] = useState(true);
+  const [mappingName, setMappingName] = useState("");
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
 
   useEffect(() => {
     if (fileMappings.length === 0) {
@@ -73,6 +82,23 @@ const MappingPage = () => {
   const handleValidate = () => {
     runValidation();
     navigate('/validation');
+  };
+
+  const handleSaveMapping = () => {
+    const templateMappings = fileMappings
+      .filter(fm => fm.templateId)
+      .map(fm => ({
+        templateId: fm.templateId!,
+        mapping: fm.mapping,
+      }));
+    
+    saveMapping(mappingName, templateMappings);
+    toast({
+      title: "Mapping Saved",
+      description: `Configuration "${mappingName}" has been saved successfully.`,
+    });
+    setMappingName("");
+    setIsSaveDialogOpen(false);
   };
 
   if (isParsing) {
@@ -145,7 +171,40 @@ const MappingPage = () => {
             </Card>
           );
         })}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" disabled={!isMappingComplete}>
+                <Save className="mr-2 h-4 w-4" />
+                Save Mapping
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Save Mapping Configuration</DialogTitle>
+                <DialogDescription>
+                  Give this mapping configuration a name for future use.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="name" className="text-right">
+                    Name
+                  </Label>
+                  <Input
+                    id="name"
+                    value={mappingName}
+                    onChange={(e) => setMappingName(e.target.value)}
+                    className="col-span-3"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit" onClick={handleSaveMapping} disabled={!mappingName}>Save configuration</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           <Button size="lg" onClick={handleValidate} disabled={!isMappingComplete || runStatus === 'pending'}>
             {runStatus === 'pending' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Harmonize and Validate
