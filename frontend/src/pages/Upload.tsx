@@ -8,22 +8,23 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UploadCloud, File, X } from "lucide-react";
-import { useState } from "react";
+import { useNewRun } from "@/context/NewRunContext";
+import { useNavigate } from "react-router-dom";
 
 const UploadPage = () => {
-  const [files, setFiles] = useState<File[]>([]);
+  const { files, addFiles, removeFile } = useNewRun();
+  const navigate = useNavigate();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       const newFiles = Array.from(event.target.files);
-      // Simple validation for CSV
       const csvFiles = newFiles.filter(file => file.type === 'text/csv' || file.name.endsWith('.csv'));
-      setFiles(prevFiles => [...prevFiles, ...csvFiles]);
+      addFiles(csvFiles);
     }
   };
 
-  const removeFile = (fileName: string) => {
-    setFiles(files.filter(file => file.name !== fileName));
+  const handleProceed = () => {
+    navigate('/mapping');
   };
 
   return (
@@ -94,7 +95,7 @@ const UploadPage = () => {
                 ))}
               </ul>
               <div className="mt-6 flex justify-end">
-                <Button size="lg">Proceed to Mapping</Button>
+                <Button size="lg" onClick={handleProceed}>Proceed to Mapping</Button>
               </div>
             </CardContent>
           </Card>
