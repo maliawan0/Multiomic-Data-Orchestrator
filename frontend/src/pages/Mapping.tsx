@@ -1,19 +1,20 @@
 import { Layout } from "@/components/Layout";
 import { useNewRun } from "@/context/NewRunContext";
-import { schemaTemplates, SchemaTemplate, CanonicalField } from "@/lib/schemas";
+import { schemaTemplates, SchemaTemplate } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Papa from "papaparse";
 import { useNavigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 
 const MappingPage = () => {
-  const { fileMappings, updateFileMapping, setFileColumns } = useNewRun();
+  const { fileMappings, updateFileMapping, setFileColumns, runValidation, runStatus } = useNewRun();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isParsing, setIsParsing] = useState(true);
 
   useEffect(() => {
     if (fileMappings.length === 0) {
@@ -39,7 +40,7 @@ const MappingPage = () => {
         });
       });
       await Promise.all(promises);
-      setIsLoading(false);
+      setIsParsing(false);
     };
 
     parseFiles();
@@ -61,8 +62,21 @@ const MappingPage = () => {
     return schemaTemplates.find(t => t.id === templateId);
   };
 
-  if (isLoading) {
-    return <Layout title="New Run: Map Metadata"><p>Loading files...</p></Layout>;
+  const isMappingComplete = useMemo(() => {
+    return fileMappings.every(fm => {
+      const template = getSelectedTemplate(fm.templateId);
+      if (!template) return false;
+      return template.fields.every(field => !field.required || !!fm.mapping[field.name]);
+    });
+  }, [fileMappings]);
+
+  const handleValidate = () => {
+    runValidation();
+    navigate('/validation');
+  };
+
+  if (isParsing) {
+    return <Layout title="New Run: Map Metadata"><p>Parsing files...</p></Layout>;
   }
 
   return (
@@ -132,7 +146,10 @@ const MappingPage = () => {
           );
         })}
         <div className="flex justify-end">
-          <Button size="lg">Harmonize and Validate</Button>
+          <Button size="lg" onClick={handleValidate} disabled={!isMappingComplete || runStatus === 'pending'}>
+            {runStatus === 'pending' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Harmonize and Validate
+          </Button>
         </div>
       </div>
     </Layout>

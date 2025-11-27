@@ -1,10 +1,11 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
+import { ValidationIssue, runValidation as performValidation } from '@/lib/validation';
 
-interface Mapping {
+export interface Mapping {
   [canonicalField: string]: string; // maps canonical field to csv column
 }
 
-interface FileMapping {
+export interface FileMapping {
   file: File;
   templateId?: string;
   columns: string[];
@@ -14,16 +15,22 @@ interface FileMapping {
 interface NewRunContextType {
   files: File[];
   fileMappings: FileMapping[];
+  validationIssues: ValidationIssue[];
+  runStatus: 'idle' | 'pending' | 'complete';
   addFiles: (newFiles: File[]) => void;
   removeFile: (fileName: string) => void;
   updateFileMapping: (fileName: string, update: Partial<Omit<FileMapping, 'file'>>) => void;
   setFileColumns: (fileName: string, columns: string[]) => void;
+  runValidation: () => void;
+  resetRun: () => void;
 }
 
 const NewRunContext = createContext<NewRunContextType | undefined>(undefined);
 
 export const NewRunProvider = ({ children }: { children: ReactNode }) => {
   const [fileMappings, setFileMappings] = useState<FileMapping[]>([]);
+  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
+  const [runStatus, setRunStatus] = useState<'idle' | 'pending' | 'complete'>('idle');
 
   const addFiles = (newFiles: File[]) => {
     const newFileMappings = newFiles
@@ -31,6 +38,8 @@ export const NewRunProvider = ({ children }: { children: ReactNode }) => {
       .map(file => ({ file, columns: [], mapping: {} }));
     
     setFileMappings(prev => [...prev, ...newFileMappings]);
+    setRunStatus('idle');
+    setValidationIssues([]);
   };
 
   const removeFile = (fileName: string) => {
@@ -49,10 +58,37 @@ export const NewRunProvider = ({ children }: { children: ReactNode }) => {
     ));
   };
 
+  const runValidation = () => {
+    setRunStatus('pending');
+    // Simulate async process
+    setTimeout(() => {
+      const issues = performValidation(fileMappings);
+      setValidationIssues(issues);
+      setRunStatus('complete');
+    }, 500);
+  };
+
+  const resetRun = () => {
+    setFileMappings([]);
+    setValidationIssues([]);
+    setRunStatus('idle');
+  };
+
   const files = fileMappings.map(fm => fm.file);
 
   return (
-    <NewRunContext.Provider value={{ files, fileMappings, addFiles, removeFile, updateFileMapping, setFileColumns }}>
+    <NewRunContext.Provider value={{ 
+      files, 
+      fileMappings, 
+      validationIssues,
+      runStatus,
+      addFiles, 
+      removeFile, 
+      updateFileMapping, 
+      setFileColumns,
+      runValidation,
+      resetRun
+    }}>
       {children}
     </NewRunContext.Provider>
   );

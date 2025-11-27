@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import Dashboard from "./pages/Dashboard";
 import UploadPage from "./pages/Upload";
 import MappingPage from "./pages/Mapping";
+import ValidationPage from "./pages/Validation";
 import { NewRunProvider } from "./context/NewRunContext";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/mapping" element={<MappingPage />} />
+            <Route path="/validation" element={<ValidationPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
