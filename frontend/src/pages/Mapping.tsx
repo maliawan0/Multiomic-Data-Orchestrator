@@ -84,7 +84,7 @@ const MappingPage = () => {
     navigate('/validation');
   };
 
-  const handleSaveMapping = () => {
+  const handleSaveMapping = async () => {
     const templateMappings = fileMappings
       .filter(fm => fm.templateId)
       .map(fm => ({
@@ -92,7 +92,7 @@ const MappingPage = () => {
         mapping: fm.mapping,
       }));
     
-    saveMapping(mappingName, templateMappings);
+    await saveMapping(mappingName, templateMappings);
     toast({
       title: "Mapping Saved",
       description: `Configuration "${mappingName}" has been saved successfully.`,

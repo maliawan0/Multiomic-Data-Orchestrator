@@ -18,14 +18,20 @@ const ValidationPage = () => {
   const [isExporting, setIsExporting] = useState(false);
 
   const { blockers, warnings, infos } = useMemo(() => {
-    const blockers = validationIssues.filter(i => i.severity === 'Blocker');
-    const warnings = validationIssues.filter(i => i.severity === 'Warning');
-    const infos = validationIssues.filter(i => i.severity === 'Info');
+    const blockers = validationIssues.filter(issue => issue.severity === 'Blocker');
+    const warnings = validationIssues.filter(issue => issue.severity === 'Warning');
+    const infos = validationIssues.filter(issue => issue.severity === 'Info');
     return { blockers, warnings, infos };
   }, [validationIssues]);
 
   const handleDownloadReport = () => {
-    const csv = Papa.unparse(validationIssues);
+    const csv = Papa.unparse(validationIssues.map(({ severity, fileName, rowIndex, columnName, description }) => ({
+      severity,
+      fileName,
+      row: rowIndex,
+      column: columnName,
+      description
+    })));
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     saveAs(blob, 'validation_report.csv');
     logEvent('VALIDATION_REPORT_DOWNLOADED');
@@ -37,7 +43,13 @@ const ValidationPage = () => {
     const zip = new JSZip();
 
     // 1. Final Validation Report
-    const validationReportCsv = Papa.unparse(validationIssues);
+    const validationReportCsv = Papa.unparse(validationIssues.map(({ severity, fileName, rowIndex, columnName, description }) => ({
+      severity,
+      fileName,
+      row: rowIndex,
+      column: columnName,
+      description
+    })));
     zip.file("validation_report.csv", validationReportCsv);
 
     // 2. Mapping File

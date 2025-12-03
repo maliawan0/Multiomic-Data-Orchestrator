@@ -20,9 +20,9 @@ export function Header({ title }: HeaderProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     logEvent('USER_LOGOUT');
-    logout();
+    await logout();
     navigate('/login');
   };
 
@@ -43,7 +43,7 @@ export function Header({ title }: HeaderProps) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{user?.email || 'My Account'}</DropdownMenuLabel>
+          <DropdownMenuLabel>{user?.name || user?.email || 'My Account'}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem>Settings</DropdownMenuItem>
           <DropdownMenuItem>Support</DropdownMenuItem>

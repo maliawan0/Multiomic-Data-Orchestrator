@@ -1,5 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { Mapping } from './NewRunContext';
+import { getMappings, saveMapping as apiSaveMapping, deleteMapping as apiDeleteMapping } from '@/lib/api';
+import { useAuth } from './AuthContext';
 
 export interface TemplateMapping {
   templateId: string;
@@ -10,60 +12,70 @@ export interface SavedMappingConfiguration {
   id: string;
   name: string;
   createdAt: string;
-  templateMappings: TemplateMapping[];
+  mappings: TemplateMapping[];
 }
 
 interface MappingContextType {
   savedMappings: SavedMappingConfiguration[];
-  saveMapping: (name: string, templateMappings: TemplateMapping[]) => void;
-  deleteMapping: (id: string) => void;
+  saveMapping: (name: string, templateMappings: TemplateMapping[]) => Promise<void>;
+  deleteMapping: (id: string) => Promise<void>;
+  isLoading: boolean;
 }
 
 const MappingContext = createContext<MappingContextType | undefined>(undefined);
 
 export const MappingProvider = ({ children }: { children: ReactNode }) => {
   const [savedMappings, setSavedMappings] = useState<SavedMappingConfiguration[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-    try {
-      const storedMappings = localStorage.getItem('mdo-mappings');
-      if (storedMappings) {
-        setSavedMappings(JSON.parse(storedMappings));
+    const fetchMappings = async () => {
+      if (user) {
+        try {
+          const mappings = await getMappings();
+          // Transform the response to match our interface
+          const transformedMappings: SavedMappingConfiguration[] = mappings.map((m: any) => ({
+            id: m.id || m._id,
+            name: m.name,
+            createdAt: m.createdAt || m.created_at || new Date().toISOString(),
+            mappings: m.mappings || []
+          }));
+          setSavedMappings(transformedMappings);
+        } catch (error) {
+          console.error("Failed to fetch mappings", error);
+          setSavedMappings([]);
+        }
+      } else {
+        setSavedMappings([]);
       }
-    } catch (error) {
-      console.error("Failed to parse mappings from localStorage", error);
-      localStorage.removeItem('mdo-mappings');
-    }
-  }, []);
-
-  const updateLocalStorage = (mappings: SavedMappingConfiguration[]) => {
-    localStorage.setItem('mdo-mappings', JSON.stringify(mappings));
-  };
-
-  const saveMapping = (name: string, templateMappings: TemplateMapping[]) => {
-    const newMapping: SavedMappingConfiguration = {
-      id: `map-${new Date().getTime()}`,
-      name,
-      createdAt: new Date().toISOString(),
-      templateMappings,
+      setIsLoading(false);
     };
-    setSavedMappings(prev => {
-      const updated = [...prev, newMapping];
-      updateLocalStorage(updated);
-      return updated;
-    });
+
+    fetchMappings();
+  }, [user]);
+
+  const saveMapping = async (name: string, templateMappings: TemplateMapping[]) => {
+    const response = await apiSaveMapping({ name, mappings: templateMappings });
+    
+    // Transform the response to match our interface
+    const newMapping: SavedMappingConfiguration = {
+      id: response.id || response._id,
+      name: response.name,
+      createdAt: response.createdAt || response.created_at || new Date().toISOString(),
+      mappings: response.mappings || templateMappings
+    };
+    
+    setSavedMappings(prev => [...prev, newMapping]);
   };
 
-  const deleteMapping = (id: string) => {
-    setSavedMappings(prev => {
-      const updated = prev.filter(m => m.id !== id);
-      updateLocalStorage(updated);
-      return updated;
-    });
+  const deleteMapping = async (id: string) => {
+    await apiDeleteMapping(id);
+    setSavedMappings(prev => prev.filter(m => m.id !== id));
   };
 
   return (
-    <MappingContext.Provider value={{ savedMappings, saveMapping, deleteMapping }}>
+    <MappingContext.Provider value={{ savedMappings, saveMapping, deleteMapping, isLoading }}>
       {children}
     </MappingContext.Provider>
   );
