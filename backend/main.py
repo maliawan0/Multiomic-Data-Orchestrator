@@ -314,7 +314,14 @@ def hash_password(password: str) -> str:
     password_bytes = password.encode('utf-8')
     if len(password_bytes) > 72:
         raise ValueError("Password exceeds bcrypt's 72-byte limit. This should have been caught during validation.")
-    return pwd_context.hash(password)
+    
+    try:
+        return pwd_context.hash(password)
+    except ValueError as e:
+        # Catch bcrypt's own 72-byte limit error as a fallback
+        if "cannot be longer than 72 bytes" in str(e):
+            raise ValueError("Password exceeds bcrypt's 72-byte limit. Please use a shorter password.")
+        raise
 
 def validate_password(password: str) -> Tuple[bool, Optional[str]]:
     """
@@ -459,10 +466,19 @@ async def signup(request: SignUpRequest = Body(...)):
         )
     
     # Create new user
+    try:
+        password_hash = hash_password(request.password)
+    except ValueError as e:
+        # Catch bcrypt 72-byte limit error if validation somehow missed it
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is too long (maximum 72 bytes). Please use a shorter password.",
+        )
+    
     user_doc = {
         "email": request.email,
         "name": request.name,
-        "password_hash": hash_password(request.password),
+        "password_hash": password_hash,
         "created_at": datetime.utcnow()
     }
     
