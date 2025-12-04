@@ -20,25 +20,48 @@ load_dotenv()
 app = FastAPI(title="Multiomic Data Orchestrator API", version="1.0.0")
 
 # CORS Configuration
-origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+# Get CORS origins from environment variable
+# Default to localhost for local development (allows credentials)
+cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
+# Parse and clean origins - remove trailing slashes and whitespace
+origins = []
+for origin in cors_origins_str.split(","):
+    cleaned = origin.strip().rstrip("/")
+    if cleaned:
+        origins.append(cleaned)
 
+# Log CORS configuration (will be printed on startup)
+print(f"[STARTUP] CORS_ORIGINS env: {cors_origins_str}")
+print(f"[STARTUP] CORS allowed origins: {origins}")
+
+# CORS middleware configuration
+# Note: When allow_credentials=True, you CANNOT use allow_origins=["*"]
+# This is a CORS specification requirement. We always use specific origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For development; restrict in production
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Configuration
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-SECRET_KEY = os.getenv("JWT_SECRET", "a_very_secret_key_change_in_production")
+MONGODB_URI = os.getenv("MONGODB_URI")
+if not MONGODB_URI:
+    raise ValueError("MONGODB_URI environment variable is required")
+
+SECRET_KEY = os.getenv("JWT_SECRET")
+if not SECRET_KEY:
+    raise ValueError("JWT_SECRET environment variable is required")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRES_IN", "60"))
 
 # Database
+DATABASE_NAME = os.getenv("DATABASE_NAME", "mdo")
 client = AsyncIOMotorClient(MONGODB_URI)
-db = client.get_database("mdo")
+db = client.get_database(DATABASE_NAME)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -356,23 +379,27 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
 
 @app.on_event("startup")
 async def startup_event():
-    """Create seed user if it doesn't exist"""
-    seed_email = "alex@mdo.com"
-    seed_password = "password"
-    seed_name = "Alex"
+    """Create seed user if configured and doesn't exist"""
+    seed_email = os.getenv("SEED_USER_EMAIL")
+    seed_password = os.getenv("SEED_USER_PASSWORD")
+    seed_name = os.getenv("SEED_USER_NAME", "Admin")
     
-    existing_user = await db.users.find_one({"email": seed_email})
-    if not existing_user:
-        user_doc = {
-            "email": seed_email,
-            "name": seed_name,
-            "password_hash": hash_password(seed_password),
-            "created_at": datetime.utcnow()
-        }
-        await db.users.insert_one(user_doc)
-        print(f"[STARTUP] Created seed user: {seed_email}")
+    # Only create seed user if email and password are provided
+    if seed_email and seed_password:
+        existing_user = await db.users.find_one({"email": seed_email})
+        if not existing_user:
+            user_doc = {
+                "email": seed_email,
+                "name": seed_name,
+                "password_hash": hash_password(seed_password),
+                "created_at": datetime.utcnow()
+            }
+            await db.users.insert_one(user_doc)
+            print(f"[STARTUP] Created seed user: {seed_email}")
+        else:
+            print(f"[STARTUP] Seed user already exists: {seed_email}")
     else:
-        print(f"[STARTUP] Seed user already exists: {seed_email}")
+        print(f"[STARTUP] Seed user not configured (SEED_USER_EMAIL and SEED_USER_PASSWORD not set)")
 
 # ============== Health Check ==============
 
@@ -755,5 +782,5 @@ async def get_run(run_id: str, current_user: dict = Depends(get_current_user)):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", "8000"))
     uvicorn.run(app, host="0.0.0.0", port=port)

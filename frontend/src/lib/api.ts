@@ -1,10 +1,22 @@
 import axios from 'axios';
 
-// Get API base URL from environment variable, fallback to default for development
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+// Get API base URL from environment variable (required in production)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+if (!API_BASE_URL) {
+  console.error('VITE_API_BASE_URL environment variable is not set');
+  throw new Error('VITE_API_BASE_URL environment variable is required');
+}
+
+// Ensure it always ends with /api/v1
+let baseURL = API_BASE_URL;
+if (!baseURL.endsWith('/api/v1')) {
+  // If base URL doesn't end with /api/v1, append it
+  baseURL = baseURL.replace(/\/+$/, '') + '/api/v1';
+}
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: baseURL,
 });
 
 api.interceptors.request.use((config) => {
