@@ -306,17 +306,30 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 def hash_password(password: str) -> str:
+    """
+    Hash a password using bcrypt.
+    Note: bcrypt has a 72-byte limit. This should be validated before calling this function.
+    """
+    # Safety check: ensure password doesn't exceed bcrypt's 72-byte limit
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        raise ValueError("Password exceeds bcrypt's 72-byte limit. This should have been caught during validation.")
     return pwd_context.hash(password)
 
 def validate_password(password: str) -> Tuple[bool, Optional[str]]:
     """
     Validate password strength.
     Returns (is_valid, error_message)
+    Note: bcrypt has a 72-byte limit, so we enforce that limit here.
     """
     if len(password) < 8:
         return False, "Password must be at least 8 characters long"
-    if len(password) > 128:
-        return False, "Password must be less than 128 characters"
+    
+    # Check byte length (bcrypt limitation: max 72 bytes)
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        return False, "Password is too long (maximum 72 bytes). Please use a shorter password."
+    
     # Check for at least one letter and one number
     has_letter = any(c.isalpha() for c in password)
     has_number = any(c.isdigit() for c in password)
